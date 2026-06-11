@@ -1,0 +1,296 @@
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+-- Services
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Variables
+local spectateTarget = nil
+local followTarget = nil
+local followConnection = nil
+local distanceBehind = 3 -- Khoảng cách duy trì sau lưng (studs)
+
+-- === KHỞI TẠO GIAO DIỆN CHÍNH (DARK THEME) ===
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = game.CoreGui
+screenGui.Name = "SpecAndFollowSystemV2"
+screenGui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 240, 0, 280)
+mainFrame.Position = UDim2.new(0.8, -20, 0.4, -140)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Thanh tiêu đề Menu
+local titleBar = Instance.new("TextLabel")
+titleBar.Size = UDim2.new(1, 0, 0, 25)
+titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+titleBar.Text = "Spectate & Follow Menu VIP"
+titleBar.TextColor3 = Color3.fromRGB(0, 255, 255)
+titleBar.Font = Enum.Font.GothamBold
+titleBar.TextSize = 12
+titleBar.Parent = mainFrame
+
+-- Khung cuộn danh sách người chơi
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -10, 1, -50)
+scrollFrame.Position = UDim2.new(0, 5, 0, 30)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderSizePixel = 0
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 4
+scrollFrame.Parent = mainFrame
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Parent = scrollFrame
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Sắp xếp theo thứ tự ưu tiên LayoutOrder
+uiListLayout.Padding = UDim.new(0, 5)
+
+-- Dòng chữ hướng dẫn nhỏ ở đáy
+local hint = Instance.new("TextLabel")
+hint.Size = UDim2.new(1, 0, 0, 20)
+hint.Position = UDim2.new(0, 0, 1, -20)
+hint.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+hint.Text = "Press J or Click Top-Left Button"
+hint.TextColor3 = Color3.fromRGB(150, 150, 150)
+hint.Font = Enum.Font.Gotham
+hint.TextSize = 10
+hint.Parent = mainFrame
+
+-- NÚT ẨN/HIỆN MENU (CÓ THỂ KÉO THẢ)
+local toggleMenuButton = Instance.new("TextButton")
+toggleMenuButton.Size = UDim2.new(0, 80, 0, 30)
+toggleMenuButton.Position = UDim2.new(0, 10, 0, 10)
+toggleMenuButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+toggleMenuButton.BorderSizePixel = 2
+toggleMenuButton.BorderColor3 = Color3.fromRGB(0, 255, 255)
+toggleMenuButton.Text = "Menu: ON"
+toggleMenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleMenuButton.Font = Enum.Font.GothamBold
+toggleMenuButton.TextSize = 12
+toggleMenuButton.Active = true
+toggleMenuButton.Draggable = true
+toggleMenuButton.Parent = screenGui
+
+local function ToggleMenuVisibility()
+    mainFrame.Visible = not mainFrame.Visible
+    toggleMenuButton.Text = mainFrame.Visible and "Menu: ON" or "Menu: OFF"
+end
+
+-- === CÁC HÀM XỬ LÝ LOGIC NGẦM ===
+
+-- Hàm Reset Camera về bản thân
+local function ResetCamera()
+    spectateTarget = nil
+    pcall(function()
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Camera.CameraSubject = Player.Character.Humanoid
+        end
+    end)
+end
+
+-- Hàm dừng bám đuôi hoàn toàn
+local function StopFollowing()
+    followTarget = nil
+    if followConnection then
+        followConnection:Disconnect()
+        followConnection = nil
+    end
+end
+
+-- Vòng lặp bám đuôi thời gian thực
+local function StartFollowing(player)
+    StopFollowing()
+    followTarget = player
+    
+    followConnection = RunService.Heartbeat:Connect(function()
+        local myChar = Player.Character
+        local tChar = followTarget and followTarget.Character
+        
+        if myChar and tChar then
+            local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+            
+            if myRoot and tRoot then
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, distanceBehind)
+            end
+        else
+            StopFollowing()
+            RefreshMenu()
+        end
+    end)
+end
+
+-- === HÀM VẼ GIAO DIỆN VÀ CẬP NHẬT MÀU SẮC NÚT ===
+function RefreshMenu()
+    -- Xóa danh sách cũ đi để vẽ lại
+    for _, child in ipairs(scrollFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    
+    local count = 0
+    local allPlayers = Players:GetPlayers()
+    
+    for _, p in ipairs(allPlayers) do
+        count = count + 1
+        
+        -- Khung chứa hàng của một người chơi
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, -8, 0, 30)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        itemFrame.BorderSizePixel = 0
+        itemFrame.Parent = scrollFrame
+        
+        -- ĐẶT THỨ TỰ ƯU TIÊN (LayoutOrder): Nếu là bản thân tôi thì = 0 (luôn đứng đầu)
+        if p == Player then
+            itemFrame.LayoutOrder = 0
+            itemFrame.BackgroundColor3 = Color3.fromRGB(35, 40, 50) -- Đổi nền xanh sẫm tí cho phân biệt VIP
+        else
+            itemFrame.LayoutOrder = 1 -- Các người chơi khác xếp phía sau
+        end
+        
+        -- Nhãn hiển thị Tên
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, -75, 1, 0)
+        nameLabel.Position = UDim2.new(0, 5, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.TextSize = 11
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Parent = itemFrame
+        
+        if p == Player then
+            nameLabel.Text = "[Tôi] " .. p.Name
+            nameLabel.TextColor3 = Color3.fromRGB(0, 255, 150) -- Màu xanh Neon cho nổi bật
+            nameLabel.Font = Enum.Font.GothamBold
+        else
+            nameLabel.Text = p.Name
+            nameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+        end
+        
+        -- NÚT XEM (Màu Xanh Dương)
+        local specBtn = Instance.new("TextButton")
+        specBtn.Size = UDim2.new(0, 30, 0, 22)
+        specBtn.Position = UDim2.new(1, -70, 0, 4)
+        specBtn.BorderSizePixel = 0
+        specBtn.Text = "Xem"
+        specBtn.TextSize = 10
+        specBtn.Font = Enum.Font.GothamBold
+        specBtn.Parent = itemFrame
+        
+        -- Đổi màu nút Xem dựa theo trạng thái đang khóa mục tiêu nào
+        if (spectateTarget == p) or (p == Player and spectateTarget == nil) then
+            specBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255) -- Xanh dương khi đang xem
+            specBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            specBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- Xám mặc định
+            specBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+        
+        -- NÚT BÁM ĐUÔI (Màu Đỏ)
+        local followBtn = Instance.new("TextButton")
+        followBtn.Size = UDim2.new(0, 30, 0, 22)
+        followBtn.Position = UDim2.new(1, -35, 0, 4)
+        followBtn.BorderSizePixel = 0
+        followBtn.TextSize = 10
+        followBtn.Font = Enum.Font.GothamBold
+        followBtn.Parent = itemFrame
+        
+        if p == Player then
+            -- Nếu là chính mình: Khóa nút Đuôi lại không cho bấm
+            followBtn.Text = "X"
+            followBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            followBtn.TextColor3 = Color3.fromRGB(100, 100, 100)
+        else
+            followBtn.Text = "Đuôi"
+            if followTarget == p then
+                followBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Đỏ rực khi đang bám
+                followBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                followBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                followBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+            end
+        end
+        
+        -- SỰ KIỆN CLICK NÚT XEM
+        specBtn.MouseButton1Click:Connect(function()
+            if p == Player then
+                -- Nếu tự bấm Xem chính mình -> Trả Camera về mặc định
+                ResetCamera()
+            else
+                if spectateTarget == p then
+                    ResetCamera()
+                else
+                    spectateTarget = p
+                    local function setCam()
+                        if spectateTarget == p and p.Character and p.Character:FindFirstChild("Humanoid") then
+                            Camera.CameraSubject = p.Character.Humanoid
+                        end
+                    end
+                    setCam()
+                    p.CharacterAdded:Connect(setCam)
+                end
+            end
+            RefreshMenu()
+        end)
+        
+        -- SỰ KIỆN CLICK NÚT BÁM ĐUÔI
+        if p ~= Player then
+            followBtn.MouseButton1Click:Connect(function()
+                if followTarget == p then
+                    StopFollowing()
+                else
+                    StartFollowing(p)
+                end
+                RefreshMenu()
+            end)
+        end
+        
+    end
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, count * 35)
+end
+
+-- === LẮNG NGHE SỰ KIỆN TỪ HỆ THỐNG ===
+
+toggleMenuButton.MouseButton1Click:Connect(ToggleMenuVisibility)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.J then
+        ToggleMenuVisibility()
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if spectateTarget == player then ResetCamera() end
+    if followTarget == player then StopFollowing() end
+    RefreshMenu()
+end)
+
+Players.PlayerAdded:Connect(RefreshMenu)
+
+-- Đảm bảo Camera hoạt động bình thường khi hồi sinh
+Player.CharacterAdded:Connect(function()
+    task.wait(0.2)
+    if spectateTarget then
+        pcall(function()
+            if spectateTarget.Character and spectateTarget.Character:FindFirstChild("Humanoid") then
+                Camera.CameraSubject = spectateTarget.Character.Humanoid
+            end
+        end)
+    else
+        ResetCamera()
+    end
+    RefreshMenu()
+end)
+
+-- Khởi chạy quét menu lần đầu
+RefreshMenu()
