@@ -1,10 +1,8 @@
 --[[
     PREMIUM HITBOX EXPANDER & DRAWING + HIGHLIGHT ESP INTEGRATED SYSTEM
     Phiên bản nâng cấp: 
-    - Tách biệt nút bật/tắt Viền phát quang (Highlight) riêng biệt.
-    - Cơ chế Auto-Fix chống lỗi: Tự động phát hiện và áp lại Hitbox/Highlight.
-    - Tích hợp tùy chọn Màu thường (TeamColor) và Rainbow (Cầu vồng) cho ESP + Highlight.
-    - Điều chỉnh vị trí Nhãn Tên & Khoảng cách thấp xuống, gọn gàng hơn.
+    - GIỮ NGUYÊN 100% GIAO DIỆN GỐC VÀ CÁC TÍNH NĂNG CŨ.
+    - Tích hợp thêm Tab "Misc" riêng biệt để nhận Tool Click TP.
     Tác giả UI: !vcsk0#1516
 ]]
 
@@ -62,7 +60,7 @@ end)
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/UI-Library/main/Source/MyUILib(Unamed).lua"))();
 local Window = Library:Create("Hitbox Expander")
 
--- Nút bấm MENU tròn nhỏ (~10mm) di chuyển tự do được trên điện thoại
+-- Nút bấm MENU tròn nhỏ (~10mm) di chuyển tự do được trên điện thoại (GIỮ NGUYÊN GỐC)
 local ToggleGui = Instance.new("ScreenGui", game.CoreGui)
 local Toggle = Instance.new("TextButton", ToggleGui)
 
@@ -85,10 +83,11 @@ Toggle.MouseButton1Click:connect(function()
     Library:ToggleUI()
 end)
 
--- Tạo cấu trúc 3 Tab chuẩn
+-- Tạo cấu trúc 4 Tab (Thêm Tab Misc vào cuối)
 local HomeTab = Window:Tab("Home", "rbxassetid://10888331510")
 local PlayerTab = Window:Tab("Players", "rbxassetid://12296135476")
 local VisualTab = Window:Tab("Visuals", "rbxassetid://12308581351")
+local MiscTab = Window:Tab("Misc", "rbxassetid://10888331510") -- Tạp Tab riêng biệt đúng yêu cầu
 
 -- --- TAB 1: HOME (CÀI ĐẶT HITBOX) ---
 HomeTab:InfoLabel("Chỉnh kích cỡ & Độ đậm nhạt bằng cách nhập số")
@@ -168,6 +167,25 @@ VisualTab:Toggle("Hiện Tên (Name)", function(state) getgenv().EspNames = stat
 VisualTab:Toggle("Hiện Khoảng Cách (Distance)", function(state) getgenv().EspDistance = state end)
 VisualTab:Toggle("Hiện Khung Hộp (Box)", function(state) getgenv().EspBoxes = state end)
 VisualTab:Toggle("Hiện Tia Chỉ Đường (Lines)", function(state) getgenv().EspLines = state end)
+
+-- --- TAB 4: MISC (MỤC RIÊNG BIỆT THÊM MỚI THEO YÊU CẦU) ---
+MiscTab:Section("Utilities")
+MiscTab:Button("Get Click TP Tool", function()
+    local mouse = Player:GetMouse()
+    local tool = Instance.new("Tool")
+    tool.RequiresHandle = false
+    tool.Name = "Equip to Click TP"
+    
+    tool.Activated:connect(function()
+        local pos = mouse.Hit + Vector3.new(0, 2.5, 0)
+        pos = CFrame.new(pos.X, pos.Y, pos.Z)
+        if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            Player.Character.HumanoidRootPart.CFrame = pos
+        end
+    end)
+    
+    tool.Parent = Player.Backpack
+end)
 
 
 -- === LOGIC 1: ĐIỀU CHỈNH ĐỘ ĐẬM NHẠT VÀ KÍCH CỠ HITBOX (TÍCH HỢP AUTO-FIX) ===
