@@ -13,70 +13,207 @@ local UserInputService = game:GetService("UserInputService")
 local spectateTarget = nil
 local followTarget = nil
 local followConnection = nil
-local distanceBehind = 3 -- Khoảng cách duy trì sau lưng (studs)
 
--- === KHỞI TẠO GIAO DIỆN CHÍNH (DARK THEME) ===
+-- Cấu hình mặc định
+local followMode = "Sau lưng"
+local followDistance = 3      
+local rotateSpeed = 2         
+local rotationAngle = 0       
+
+-- === KHỞI TẠO GIAO DIỆN CHÍNH (GIỮ NGUYÊN 100% UI CŨ) ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Parent = game.CoreGui
-screenGui.Name = "SpecAndFollowSystemV2"
+screenGui.Name = "SpecAndFollowSystemV4_Smooth"
 screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 280)
-mainFrame.Position = UDim2.new(0.8, -20, 0.4, -140)
+mainFrame.Size = UDim2.new(0, 220, 0, 385) 
+mainFrame.Position = UDim2.new(0.7, 0, 0.25, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
--- Thanh tiêu đề Menu
 local titleBar = Instance.new("TextLabel")
 titleBar.Size = UDim2.new(1, 0, 0, 25)
 titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-titleBar.Text = "Spectate & Follow Menu VIP"
+titleBar.Text = "Spectate & Follow (VIP V4)"
 titleBar.TextColor3 = Color3.fromRGB(0, 255, 255)
 titleBar.Font = Enum.Font.GothamBold
 titleBar.TextSize = 12
 titleBar.Parent = mainFrame
 
--- Khung cuộn danh sách người chơi
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -50)
+scrollFrame.Size = UDim2.new(1, -10, 0, 100) 
 scrollFrame.Position = UDim2.new(0, 5, 0, 30)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.BorderSizePixel = 0
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollFrame.ScrollBarThickness = 4
+scrollFrame.ScrollBarThickness = 3
 scrollFrame.Parent = mainFrame
 
 local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.Parent = scrollFrame
-uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Sắp xếp theo thứ tự ưu tiên LayoutOrder
-uiListLayout.Padding = UDim.new(0, 5)
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 4)
 
--- Dòng chữ hướng dẫn nhỏ ở đáy
+local configFrame = Instance.new("Frame")
+configFrame.Size = UDim2.new(1, -10, 0, 220)
+configFrame.Position = UDim2.new(0, 5, 0, 135) 
+configFrame.BackgroundTransparency = 1
+configFrame.Parent = mainFrame
+
+local modeTitle = Instance.new("TextLabel")
+modeTitle.Size = UDim2.new(1, 0, 0, 18)
+modeTitle.BackgroundTransparency = 1
+modeTitle.Text = "--- CHỌN CHẾ ĐỘ (VUỐT XUỐNG) ---"
+modeTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
+modeTitle.Font = Enum.Font.GothamBold
+modeTitle.TextSize = 10
+modeTitle.Parent = configFrame
+
+local modeScroll = Instance.new("ScrollingFrame")
+modeScroll.Size = UDim2.new(1, 0, 0, 115)
+modeScroll.Position = UDim2.new(0, 0, 0, 20)
+modeScroll.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+modeScroll.BorderSizePixel = 0
+modeScroll.ScrollBarThickness = 4
+modeScroll.CanvasSize = UDim2.new(0, 0, 0, 230)
+modeScroll.Parent = configFrame
+
+local modeListLayout = Instance.new("UIListLayout")
+modeListLayout.Parent = modeScroll
+modeListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+modeListLayout.Padding = UDim.new(0, 4)
+
+local modeButtons = {}
+local modes = {"Sau lưng", "Trước mặt", "Bên trái", "Bên phải", "Bên trên", "Bên dưới", "Xoay tròn"}
+
+local function UpdateModeUI()
+    for mName, btn in pairs(modeButtons) do
+        if followMode == mName then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+            btn.TextColor3 = Color3.fromRGB(30, 30, 30)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+    end
+end
+
+for _, m in ipairs(modes) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -6, 0, 26)
+    btn.Text = "  [ Chế độ ] : " .. m
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.BorderSizePixel = 0
+    btn.Parent = modeScroll
+    modeButtons[m] = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        followMode = m
+        UpdateModeUI()
+    end)
+end
+UpdateModeUI()
+
+local distanceFrame = Instance.new("Frame")
+distanceFrame.Size = UDim2.new(1, 0, 0, 24)
+distanceFrame.Position = UDim2.new(0, 0, 0, 142)
+distanceFrame.BackgroundTransparency = 1
+distanceFrame.Parent = configFrame
+
+local distLabel = Instance.new("TextLabel")
+distLabel.Size = UDim2.new(0, 120, 1, 0)
+distLabel.BackgroundTransparency = 1
+distLabel.Text = "Tầm xa (1-200 studs):"
+distLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+distLabel.Font = Enum.Font.Gotham
+distLabel.TextSize = 10
+distLabel.TextXAlignment = Enum.TextXAlignment.Left
+distLabel.Parent = distanceFrame
+
+local distInput = Instance.new("TextBox")
+distInput.Size = UDim2.new(0, 80, 1, 0)
+distInput.Position = UDim2.new(1, -80, 0, 0)
+distInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+distInput.BorderSizePixel = 0
+distInput.Text = tostring(followDistance)
+distInput.TextColor3 = Color3.fromRGB(0, 255, 255)
+distInput.Font = Enum.Font.GothamBold
+distInput.TextSize = 11
+distInput.ClearTextOnFocus = false
+distInput.Parent = distanceFrame
+
+distInput.FocusLost:Connect(function()
+    local num = tonumber(distInput.Text)
+    if num then
+        if num > 200 then num = 200 elseif num < 1 then num = 1 end
+        followDistance = num
+    end
+    distInput.Text = tostring(followDistance)
+end)
+
+local speedFrame = Instance.new("Frame")
+speedFrame.Size = UDim2.new(1, 0, 0, 24)
+speedFrame.Position = UDim2.new(0, 0, 0, 172)
+speedFrame.BackgroundTransparency = 1
+speedFrame.Parent = configFrame
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0, 120, 1, 0)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "Tốc độ xoay (1-20):"
+speedLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextSize = 10
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+speedLabel.Parent = speedFrame
+
+local speedInput = Instance.new("TextBox")
+speedInput.Size = UDim2.new(0, 80, 1, 0)
+speedInput.Position = UDim2.new(1, -80, 0, 0)
+speedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+speedInput.BorderSizePixel = 0
+speedInput.Text = tostring(rotateSpeed)
+speedInput.TextColor3 = Color3.fromRGB(0, 255, 255)
+speedInput.Font = Enum.Font.GothamBold
+speedInput.TextSize = 11
+speedInput.ClearTextOnFocus = false
+speedInput.Parent = speedFrame
+
+speedInput.FocusLost:Connect(function()
+    local num = tonumber(speedInput.Text)
+    if num then
+        if num > 20 then num = 20 elseif num < 0.1 then num = 0.1 end
+        rotateSpeed = num
+    end
+    speedInput.Text = tostring(rotateSpeed)
+end)
+
 local hint = Instance.new("TextLabel")
-hint.Size = UDim2.new(1, 0, 0, 20)
-hint.Position = UDim2.new(0, 0, 1, -20)
+hint.Size = UDim2.new(1, 0, 0, 18)
+hint.Position = UDim2.new(0, 0, 1, -18)
 hint.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-hint.Text = "Press J or Click Top-Left Button"
-hint.TextColor3 = Color3.fromRGB(150, 150, 150)
+hint.Text = "Click Top-Left Button or Press J"
+hint.TextColor3 = Color3.fromRGB(140, 140, 140)
 hint.Font = Enum.Font.Gotham
-hint.TextSize = 10
+hint.TextSize = 9
 hint.Parent = mainFrame
 
--- NÚT ẨN/HIỆN MENU (CÓ THỂ KÉO THẢ)
 local toggleMenuButton = Instance.new("TextButton")
-toggleMenuButton.Size = UDim2.new(0, 80, 0, 30)
+toggleMenuButton.Size = UDim2.new(0, 75, 0, 28)
 toggleMenuButton.Position = UDim2.new(0, 10, 0, 10)
 toggleMenuButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-toggleMenuButton.BorderSizePixel = 2
+toggleMenuButton.BorderSizePixel = 1
 toggleMenuButton.BorderColor3 = Color3.fromRGB(0, 255, 255)
 toggleMenuButton.Text = "Menu: ON"
 toggleMenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleMenuButton.Font = Enum.Font.GothamBold
-toggleMenuButton.TextSize = 12
+toggleMenuButton.TextSize = 11
 toggleMenuButton.Active = true
 toggleMenuButton.Draggable = true
 toggleMenuButton.Parent = screenGui
@@ -86,9 +223,7 @@ local function ToggleMenuVisibility()
     toggleMenuButton.Text = mainFrame.Visible and "Menu: ON" or "Menu: OFF"
 end
 
--- === CÁC HÀM XỬ LÝ LOGIC NGẦM ===
-
--- Hàm Reset Camera về bản thân
+-- === LOGIC GAMEPLAY (ĐÃ FIX LỖI RUNG + CHẠY TẠI CHỖ) ===
 local function ResetCamera()
     spectateTarget = nil
     pcall(function()
@@ -98,7 +233,6 @@ local function ResetCamera()
     end)
 end
 
--- Hàm dừng bám đuôi hoàn toàn
 local function StopFollowing()
     followTarget = nil
     if followConnection then
@@ -107,21 +241,54 @@ local function StopFollowing()
     end
 end
 
--- Vòng lặp bám đuôi thời gian thực
 local function StartFollowing(player)
     StopFollowing()
     followTarget = player
     
-    followConnection = RunService.Heartbeat:Connect(function()
+    followConnection = RunService.Heartbeat:Connect(function(deltaTime)
         local myChar = Player.Character
         local tChar = followTarget and followTarget.Character
         
         if myChar and tChar then
             local myRoot = myChar:FindFirstChild("HumanoidRootPart")
             local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+            local myHumanoid = myChar:FindFirstChildOfClass("Humanoid")
             
             if myRoot and tRoot then
-                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, distanceBehind)
+                -- FIX LỖI CHẠY TẠI CHỖ: Triệt tiêu gia tốc chuyển động vật lý và vận tốc gốc
+                myRoot.Velocity = Vector3.new(0, 0, 0)
+                myRoot.RotVelocity = Vector3.new(0, 0, 0)
+                if myHumanoid then
+                    myHumanoid:Move(Vector3.new(0, 0, 0)) -- Buộc dừng di chuyển hoạt ảnh đi bộ
+                end
+                
+                local targetCFrame = tRoot.CFrame
+                
+                if followMode == "Sau lưng" then
+                    targetCFrame = targetCFrame * CFrame.new(0, 0, followDistance)
+                elseif followMode == "Trước mặt" then
+                    targetCFrame = targetCFrame * CFrame.new(0, 0, -followDistance) * CFrame.fromEulerAnglesXYZ(0, math.rad(180), 0)
+                elseif followMode == "Bên trái" then
+                    -- FIX RUNG MÁY KHOAN: Giữ nguyên độ cao Y ổn định và dùng điểm nhìn cố định chính xác
+                    local leftPos = (tRoot.CFrame * CFrame.new(-followDistance, 0, 0)).Position
+                    targetCFrame = CFrame.lookAt(leftPos, tRoot.Position)
+                elseif followMode == "Bên phải" then
+                    -- FIX RUNG MÁY KHOAN: Giữ nguyên độ cao Y ổn định và dùng điểm nhìn cố định chính xác
+                    local rightPos = (tRoot.CFrame * CFrame.new(followDistance, 0, 0)).Position
+                    targetCFrame = CFrame.lookAt(rightPos, tRoot.Position)
+                elseif followMode == "Bên trên" then
+                    targetCFrame = targetCFrame * CFrame.new(0, followDistance, 0) * CFrame.fromEulerAnglesXYZ(math.rad(-90), 0, 0)
+                elseif followMode == "Bên dưới" then
+                    targetCFrame = targetCFrame * CFrame.new(0, -followDistance, 0) * CFrame.fromEulerAnglesXYZ(math.rad(90), 0, 0)
+                elseif followMode == "Xoay tròn" then
+                    rotationAngle = rotationAngle + (deltaTime * rotateSpeed)
+                    local offsetX = math.sin(rotationAngle) * followDistance
+                    local offsetZ = math.cos(rotationAngle) * followDistance
+                    targetCFrame = CFrame.lookAt(tRoot.Position + Vector3.new(offsetX, 0, offsetZ), tRoot.Position)
+                end
+                
+                -- Áp dụng vị trí mượt mà tuyệt đối
+                myRoot.CFrame = targetCFrame
             end
         else
             StopFollowing()
@@ -130,9 +297,7 @@ local function StartFollowing(player)
     end)
 end
 
--- === HÀM VẼ GIAO DIỆN VÀ CẬP NHẬT MÀU SẮC NÚT ===
 function RefreshMenu()
-    -- Xóa danh sách cũ đi để vẽ lại
     for _, child in ipairs(scrollFrame:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
@@ -143,77 +308,70 @@ function RefreshMenu()
     for _, p in ipairs(allPlayers) do
         count = count + 1
         
-        -- Khung chứa hàng của một người chơi
         local itemFrame = Instance.new("Frame")
-        itemFrame.Size = UDim2.new(1, -8, 0, 30)
+        itemFrame.Size = UDim2.new(1, -6, 0, 28)
         itemFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
         itemFrame.BorderSizePixel = 0
         itemFrame.Parent = scrollFrame
         
-        -- ĐẶT THỨ TỰ ƯU TIÊN (LayoutOrder): Nếu là bản thân tôi thì = 0 (luôn đứng đầu)
         if p == Player then
             itemFrame.LayoutOrder = 0
-            itemFrame.BackgroundColor3 = Color3.fromRGB(35, 40, 50) -- Đổi nền xanh sẫm tí cho phân biệt VIP
+            itemFrame.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
         else
-            itemFrame.LayoutOrder = 1 -- Các người chơi khác xếp phía sau
+            itemFrame.LayoutOrder = 1
         end
         
-        -- Nhãn hiển thị Tên
         local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(1, -75, 1, 0)
-        nameLabel.Position = UDim2.new(0, 5, 0, 0)
+        nameLabel.Size = UDim2.new(1, -70, 1, 0)
+        nameLabel.Position = UDim2.new(0, 4)
         nameLabel.BackgroundTransparency = 1
         nameLabel.Font = Enum.Font.Gotham
-        nameLabel.TextSize = 11
+        nameLabel.TextSize = 10
         nameLabel.TextXAlignment = Enum.TextXAlignment.Left
         nameLabel.Parent = itemFrame
         
         if p == Player then
             nameLabel.Text = "[Tôi] " .. p.Name
-            nameLabel.TextColor3 = Color3.fromRGB(0, 255, 150) -- Màu xanh Neon cho nổi bật
+            nameLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
             nameLabel.Font = Enum.Font.GothamBold
         else
             nameLabel.Text = p.Name
             nameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
         end
         
-        -- NÚT XEM (Màu Xanh Dương)
         local specBtn = Instance.new("TextButton")
-        specBtn.Size = UDim2.new(0, 30, 0, 22)
-        specBtn.Position = UDim2.new(1, -70, 0, 4)
+        specBtn.Size = UDim2.new(0, 30, 0, 20)
+        specBtn.Position = UDim2.new(1, -66, 0, 4)
         specBtn.BorderSizePixel = 0
         specBtn.Text = "Xem"
-        specBtn.TextSize = 10
+        specBtn.TextSize = 9
         specBtn.Font = Enum.Font.GothamBold
         specBtn.Parent = itemFrame
         
-        -- Đổi màu nút Xem dựa theo trạng thái đang khóa mục tiêu nào
         if (spectateTarget == p) or (p == Player and spectateTarget == nil) then
-            specBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255) -- Xanh dương khi đang xem
+            specBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
             specBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         else
-            specBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- Xám mặc định
+            specBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             specBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
         end
         
-        -- NÚT BÁM ĐUÔI (Màu Đỏ)
         local followBtn = Instance.new("TextButton")
-        followBtn.Size = UDim2.new(0, 30, 0, 22)
-        followBtn.Position = UDim2.new(1, -35, 0, 4)
+        followBtn.Size = UDim2.new(0, 30, 0, 20)
+        followBtn.Position = UDim2.new(1, -34, 0, 4)
         followBtn.BorderSizePixel = 0
-        followBtn.TextSize = 10
+        followBtn.TextSize = 9
         followBtn.Font = Enum.Font.GothamBold
         followBtn.Parent = itemFrame
         
         if p == Player then
-            -- Nếu là chính mình: Khóa nút Đuôi lại không cho bấm
             followBtn.Text = "X"
             followBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
             followBtn.TextColor3 = Color3.fromRGB(100, 100, 100)
         else
             followBtn.Text = "Đuôi"
             if followTarget == p then
-                followBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Đỏ rực khi đang bám
+                followBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
                 followBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             else
                 followBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -221,10 +379,8 @@ function RefreshMenu()
             end
         end
         
-        -- SỰ KIỆN CLICK NÚT XEM
         specBtn.MouseButton1Click:Connect(function()
             if p == Player then
-                -- Nếu tự bấm Xem chính mình -> Trả Camera về mặc định
                 ResetCamera()
             else
                 if spectateTarget == p then
@@ -243,7 +399,6 @@ function RefreshMenu()
             RefreshMenu()
         end)
         
-        -- SỰ KIỆN CLICK NÚT BÁM ĐUÔI
         if p ~= Player then
             followBtn.MouseButton1Click:Connect(function()
                 if followTarget == p then
@@ -254,13 +409,11 @@ function RefreshMenu()
                 RefreshMenu()
             end)
         end
-        
     end
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, count * 35)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, count * 32)
 end
 
--- === LẮNG NGHE SỰ KIỆN TỪ HỆ THỐNG ===
-
+-- === LISTENERS ===
 toggleMenuButton.MouseButton1Click:Connect(ToggleMenuVisibility)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -277,7 +430,6 @@ end)
 
 Players.PlayerAdded:Connect(RefreshMenu)
 
--- Đảm bảo Camera hoạt động bình thường khi hồi sinh
 Player.CharacterAdded:Connect(function()
     task.wait(0.2)
     if spectateTarget then
@@ -292,5 +444,4 @@ Player.CharacterAdded:Connect(function()
     RefreshMenu()
 end)
 
--- Khởi chạy quét menu lần đầu
 RefreshMenu()
