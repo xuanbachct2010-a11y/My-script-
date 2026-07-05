@@ -22,7 +22,7 @@ local rotationAngle = 0
 
 -- Cấu hình riêng cho tính năng Sphere TP (Hình cầu)
 local sphereSize = 5          
-local tpDelayMs = 200         
+local tpDelayMs = 150         -- ĐÃ ĐỔI: Đặt mặc định thành 150ms
 local lastTpTime = 0          
 local randomSpherePos = Vector3.new(0,0,0) 
 
@@ -139,6 +139,7 @@ for _, m in ipairs(modes) do
 end
 UpdateModeUI()
 
+-- 1. Ô nhập Distance (Tầm xa - LÊN ĐẾN 1000)
 local distanceFrame = Instance.new("Frame")
 distanceFrame.Size = UDim2.new(1, 0, 0, 24)
 distanceFrame.Position = UDim2.new(0, 0, 0, 142)
@@ -148,7 +149,7 @@ distanceFrame.Parent = configFrame
 local distLabel = Instance.new("TextLabel")
 distLabel.Size = UDim2.new(0, 120, 1, 0)
 distLabel.BackgroundTransparency = 1
-distLabel.Text = "Distance (1-200 studs):"
+distLabel.Text = "Distance (1-1000 studs):" -- Đã cập nhật nhãn hiển thị hiển thị thành 1000
 distLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
 distLabel.Font = Enum.Font.Gotham
 distLabel.TextSize = 10
@@ -170,12 +171,13 @@ distInput.Parent = distanceFrame
 distInput.FocusLost:Connect(function()
     local num = tonumber(distInput.Text)
     if num then
-        if num > 200 then num = 200 elseif num < 1 then num = 1 end
+        if num > 1000 then num = 1000 elseif num < 1 then num = 1 end -- ĐÃ ĐỔI: Tăng giới hạn tối đa lên 1000
         followDistance = num
     end
     distInput.Text = tostring(followDistance)
 end)
 
+-- 2. Ô nhập Rotate Speed (Tốc độ xoay)
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, 0, 0, 24)
 speedFrame.Position = UDim2.new(0, 0, 0, 172)
@@ -213,6 +215,7 @@ speedInput.FocusLost:Connect(function()
     speedInput.Text = tostring(rotateSpeed)
 end)
 
+-- 3. Ô nhập Sphere Size (Độ to hình cầu)
 local sphereSizeFrame = Instance.new("Frame")
 sphereSizeFrame.Size = UDim2.new(1, 0, 0, 24)
 sphereSizeFrame.Position = UDim2.new(0, 0, 0, 202)
@@ -250,6 +253,7 @@ sphereInput.FocusLost:Connect(function()
     sphereInput.Text = tostring(sphereSize)
 end)
 
+-- 4. Ô nhập TP Delay tính bằng Mili giây (HẠ XUỐNG TỪ 10ms - 10000ms)
 local tpDelayFrame = Instance.new("Frame")
 tpDelayFrame.Size = UDim2.new(1, 0, 0, 24)
 tpDelayFrame.Position = UDim2.new(0, 0, 0, 232)
@@ -259,7 +263,7 @@ tpDelayFrame.Parent = configFrame
 local delayLabel = Instance.new("TextLabel")
 delayLabel.Size = UDim2.new(0, 120, 1, 0)
 delayLabel.BackgroundTransparency = 1
-delayLabel.Text = "TP Delay (100-10000ms):"
+delayLabel.Text = "TP Delay (10-10000ms):" -- Đã cập nhật nhãn hiển thị tối thiểu thành 10
 delayLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
 delayLabel.Font = Enum.Font.Gotham
 delayLabel.TextSize = 10
@@ -281,7 +285,7 @@ delayInput.Parent = tpDelayFrame
 delayInput.FocusLost:Connect(function()
     local num = tonumber(delayInput.Text)
     if num then
-        if num > 10000 then num = 10000 elseif num < 100 then num = 100 end
+        if num > 10000 then num = 10000 elseif num < 10 then num = 10 end -- ĐÃ ĐỔI: Giới hạn tối thiểu tụt xuống 10ms
         tpDelayMs = num
     end
     delayInput.Text = tostring(tpDelayMs)
@@ -316,9 +320,7 @@ local function ToggleMenuVisibility()
     toggleMenuButton.Text = mainFrame.Visible and "Menu: ON" or "Menu: OFF"
 end
 
--- === LOGIC GAMEPLAY (CẢI TIẾN TỰ ĐỘNG KHÓA MỤC TIÊU KHI CHẾT) ===
-
--- Hàm cập nhật Camera an toàn, tự động bám theo Humanoid mới
+-- === LOGIC GAMEPLAY ===
 local function ApplySpectate(targetPlayer)
     pcall(function()
         if targetPlayer and targetPlayer.Character then
@@ -373,7 +375,6 @@ local function StartFollowing(player)
             local myHumanoid = myChar:FindFirstChildOfClass("Humanoid")
             local tHumanoid = tChar:FindFirstChildOfClass("Humanoid")
             
-            -- CẢI TIẾN: Chỉ dịch chuyển nếu cả hai đều đang SỐNG (Tránh lỗi văng map khi chết)
             if myRoot and tRoot and myHumanoid and tHumanoid and myHumanoid.Health > 0 and tHumanoid.Health > 0 then
                 myRoot.Velocity = Vector3.new(0, 0, 0)
                 myRoot.RotVelocity = Vector3.new(0, 0, 0)
@@ -505,17 +506,14 @@ function RefreshMenu()
                 if spectateTarget == p then
                     ResetCamera()
                 else
-                    ResetCamera() -- Dọn dẹp liên kết cũ trước
+                    ResetCamera() 
                     spectateTarget = p
-                    
-                    -- Thực hiện View luôn lập tức
                     ApplySpectate(p)
                     
-                    -- CẢI TIẾN CHÍNH: Lắng nghe sự kiện người đó hồi sinh để TỰ ĐỘNG KHOÁ LẠI CAMERA
                     targetCharAddedConn = p.CharacterAdded:Connect(function(newChar)
                         local hum = newChar:WaitForChild("Humanoid", 5)
                         if hum and spectateTarget == p then
-                            task.wait(0.2) -- Đợi camera game ổn định
+                            task.wait(0.2) 
                             ApplySpectate(p)
                         end
                     end)
@@ -542,7 +540,7 @@ end
 toggleMenuButton.MouseButton1Click:Connect(ToggleMenuVisibility)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode == Enum.KeyCode.J then
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.J then
         ToggleMenuVisibility()
     end
 end)
@@ -555,13 +553,11 @@ end)
 
 Players.PlayerAdded:Connect(RefreshMenu)
 
--- Xử lý khi CHÍNH BẢN THÂN BẠN hồi sinh
 Player.CharacterAdded:Connect(function(newChar)
     local humanoid = newChar:WaitForChild("Humanoid", 5)
     task.wait(0.3)
-    
     if spectateTarget then
-        ApplySpectate(spectateTarget) -- Giữ nguyên góc nhìn người khác sau khi bạn hồi sinh
+        ApplySpectate(spectateTarget) 
     else
         ResetCamera()
     end
