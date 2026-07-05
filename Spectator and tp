@@ -15,19 +15,29 @@ local followTarget = nil
 local followConnection = nil
 
 -- Cấu hình mặc định
-local followMode = "Sau lưng"
+local followMode = "Behind (Sau lưng)"
 local followDistance = 3      
 local rotateSpeed = 2         
 local rotationAngle = 0       
 
--- === KHỞI TẠO GIAO DIỆN CHÍNH (GIỮ NGUYÊN 100% UI CŨ) ===
+-- Cấu hình riêng cho tính năng Sphere TP (Hình cầu)
+local sphereSize = 5          
+local tpDelayMs = 200         
+local lastTpTime = 0          
+local randomSpherePos = Vector3.new(0,0,0) 
+
+-- Biến lưu trữ các Kết nối để tự động bắt sự kiện Hồi sinh (Respawn) nhằm tránh tràn bộ nhớ
+local targetCharAddedConn = nil
+local targetHumanoidDiedConn = nil
+
+-- === KHỞI TẠO GIAO DIỆN CHÍNH ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Parent = game.CoreGui
-screenGui.Name = "SpecAndFollowSystemV4_Smooth"
+screenGui.Name = "SpectatorAndTpV1_Smooth"
 screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 385) 
+mainFrame.Size = UDim2.new(0, 220, 0, 435) 
 mainFrame.Position = UDim2.new(0.7, 0, 0.25, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -38,7 +48,7 @@ mainFrame.Parent = screenGui
 local titleBar = Instance.new("TextLabel")
 titleBar.Size = UDim2.new(1, 0, 0, 25)
 titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-titleBar.Text = "Spectate & Follow (VIP V4)"
+titleBar.Text = "Spectator and tp v1"
 titleBar.TextColor3 = Color3.fromRGB(0, 255, 255)
 titleBar.Font = Enum.Font.GothamBold
 titleBar.TextSize = 12
@@ -59,7 +69,7 @@ uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 uiListLayout.Padding = UDim.new(0, 4)
 
 local configFrame = Instance.new("Frame")
-configFrame.Size = UDim2.new(1, -10, 0, 220)
+configFrame.Size = UDim2.new(1, -10, 0, 280)
 configFrame.Position = UDim2.new(0, 5, 0, 135) 
 configFrame.BackgroundTransparency = 1
 configFrame.Parent = mainFrame
@@ -67,7 +77,7 @@ configFrame.Parent = mainFrame
 local modeTitle = Instance.new("TextLabel")
 modeTitle.Size = UDim2.new(1, 0, 0, 18)
 modeTitle.BackgroundTransparency = 1
-modeTitle.Text = "--- CHỌN CHẾ ĐỘ (VUỐT XUỐNG) ---"
+modeTitle.Text = "--- SELECT MODE (SCROLL DOWN) ---"
 modeTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
 modeTitle.Font = Enum.Font.GothamBold
 modeTitle.TextSize = 10
@@ -79,7 +89,7 @@ modeScroll.Position = UDim2.new(0, 0, 0, 20)
 modeScroll.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 modeScroll.BorderSizePixel = 0
 modeScroll.ScrollBarThickness = 4
-modeScroll.CanvasSize = UDim2.new(0, 0, 0, 230)
+modeScroll.CanvasSize = UDim2.new(0, 0, 0, 260) 
 modeScroll.Parent = configFrame
 
 local modeListLayout = Instance.new("UIListLayout")
@@ -88,7 +98,16 @@ modeListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 modeListLayout.Padding = UDim.new(0, 4)
 
 local modeButtons = {}
-local modes = {"Sau lưng", "Trước mặt", "Bên trái", "Bên phải", "Bên trên", "Bên dưới", "Xoay tròn"}
+local modes = {
+    "Behind (Sau lưng)", 
+    "In Front (Trước mặt)", 
+    "Left (Bên trái)", 
+    "Right (Bên phải)", 
+    "Above (Bên trên)", 
+    "Below (Bên dưới)", 
+    "Orbit (Xoay tròn)",
+    "Sphere TP (Hình cầu)"
+}
 
 local function UpdateModeUI()
     for mName, btn in pairs(modeButtons) do
@@ -105,9 +124,9 @@ end
 for _, m in ipairs(modes) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -6, 0, 26)
-    btn.Text = "  [ Chế độ ] : " .. m
+    btn.Text = "  [ Mode ] : " .. m
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
+    btn.TextSize = 10
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.BorderSizePixel = 0
     btn.Parent = modeScroll
@@ -129,7 +148,7 @@ distanceFrame.Parent = configFrame
 local distLabel = Instance.new("TextLabel")
 distLabel.Size = UDim2.new(0, 120, 1, 0)
 distLabel.BackgroundTransparency = 1
-distLabel.Text = "Tầm xa (1-200 studs):"
+distLabel.Text = "Distance (1-200 studs):"
 distLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
 distLabel.Font = Enum.Font.Gotham
 distLabel.TextSize = 10
@@ -166,7 +185,7 @@ speedFrame.Parent = configFrame
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 120, 1, 0)
 speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "Tốc độ xoay (1-20):"
+speedLabel.Text = "Orbit Speed (1-500):"
 speedLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextSize = 10
@@ -188,10 +207,84 @@ speedInput.Parent = speedFrame
 speedInput.FocusLost:Connect(function()
     local num = tonumber(speedInput.Text)
     if num then
-        if num > 20 then num = 20 elseif num < 0.1 then num = 0.1 end
+        if num > 500 then num = 500 elseif num < 0.1 then num = 0.1 end
         rotateSpeed = num
     end
     speedInput.Text = tostring(rotateSpeed)
+end)
+
+local sphereSizeFrame = Instance.new("Frame")
+sphereSizeFrame.Size = UDim2.new(1, 0, 0, 24)
+sphereSizeFrame.Position = UDim2.new(0, 0, 0, 202)
+sphereSizeFrame.BackgroundTransparency = 1
+sphereSizeFrame.Parent = configFrame
+
+local sphereLabel = Instance.new("TextLabel")
+sphereLabel.Size = UDim2.new(0, 120, 1, 0)
+sphereLabel.BackgroundTransparency = 1
+sphereLabel.Text = "Sphere Size (1-100):"
+sphereLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+sphereLabel.Font = Enum.Font.Gotham
+sphereLabel.TextSize = 10
+sphereLabel.TextXAlignment = Enum.TextXAlignment.Left
+sphereLabel.Parent = sphereSizeFrame
+
+local sphereInput = Instance.new("TextBox")
+sphereInput.Size = UDim2.new(0, 80, 1, 0)
+sphereInput.Position = UDim2.new(1, -80, 0, 0)
+sphereInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+sphereInput.BorderSizePixel = 0
+sphereInput.Text = tostring(sphereSize)
+sphereInput.TextColor3 = Color3.fromRGB(0, 255, 255)
+sphereInput.Font = Enum.Font.GothamBold
+sphereInput.TextSize = 11
+sphereInput.ClearTextOnFocus = false
+sphereInput.Parent = sphereSizeFrame
+
+sphereInput.FocusLost:Connect(function()
+    local num = tonumber(sphereInput.Text)
+    if num then
+        if num > 100 then num = 100 elseif num < 1 then num = 1 end
+        sphereSize = num
+    end
+    sphereInput.Text = tostring(sphereSize)
+end)
+
+local tpDelayFrame = Instance.new("Frame")
+tpDelayFrame.Size = UDim2.new(1, 0, 0, 24)
+tpDelayFrame.Position = UDim2.new(0, 0, 0, 232)
+tpDelayFrame.BackgroundTransparency = 1
+tpDelayFrame.Parent = configFrame
+
+local delayLabel = Instance.new("TextLabel")
+delayLabel.Size = UDim2.new(0, 120, 1, 0)
+delayLabel.BackgroundTransparency = 1
+delayLabel.Text = "TP Delay (100-10000ms):"
+delayLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+delayLabel.Font = Enum.Font.Gotham
+delayLabel.TextSize = 10
+delayLabel.TextXAlignment = Enum.TextXAlignment.Left
+delayLabel.Parent = tpDelayFrame
+
+local delayInput = Instance.new("TextBox")
+delayInput.Size = UDim2.new(0, 80, 1, 0)
+delayInput.Position = UDim2.new(1, -80, 0, 0)
+delayInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+delayInput.BorderSizePixel = 0
+delayInput.Text = tostring(tpDelayMs)
+delayInput.TextColor3 = Color3.fromRGB(0, 255, 255)
+delayInput.Font = Enum.Font.GothamBold
+delayInput.TextSize = 11
+delayInput.ClearTextOnFocus = false
+delayInput.Parent = tpDelayFrame
+
+delayInput.FocusLost:Connect(function()
+    local num = tonumber(delayInput.Text)
+    if num then
+        if num > 10000 then num = 10000 elseif num < 100 then num = 100 end
+        tpDelayMs = num
+    end
+    delayInput.Text = tostring(tpDelayMs)
 end)
 
 local hint = Instance.new("TextLabel")
@@ -223,12 +316,27 @@ local function ToggleMenuVisibility()
     toggleMenuButton.Text = mainFrame.Visible and "Menu: ON" or "Menu: OFF"
 end
 
--- === LOGIC GAMEPLAY (ĐÃ FIX LỖI RUNG + CHẠY TẠI CHỖ) ===
+-- === LOGIC GAMEPLAY (CẢI TIẾN TỰ ĐỘNG KHÓA MỤC TIÊU KHI CHẾT) ===
+
+-- Hàm cập nhật Camera an toàn, tự động bám theo Humanoid mới
+local function ApplySpectate(targetPlayer)
+    pcall(function()
+        if targetPlayer and targetPlayer.Character then
+            local humanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                Camera.CameraSubject = humanoid
+            end
+        end
+    end)
+end
+
 local function ResetCamera()
     spectateTarget = nil
+    if targetCharAddedConn then targetCharAddedConn:Disconnect() targetCharAddedConn = nil end
+    if targetHumanoidDiedConn then targetHumanoidDiedConn:Disconnect() targetHumanoidDiedConn = nil end
     pcall(function()
-        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Camera.CameraSubject = Player.Character.Humanoid
+        if Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
+            Camera.CameraSubject = Player.Character:FindFirstChildOfClass("Humanoid")
         end
     end)
 end
@@ -241,9 +349,19 @@ local function StopFollowing()
     end
 end
 
+local function GetRandomSpherePoint(radius)
+    local u = math.random()
+    local v = math.random()
+    local theta = u * 2 * math.pi
+    local phi = math.acos(2 * v - 1)
+    return Vector3.new(radius * math.sin(phi) * math.cos(theta), radius * math.sin(phi) * math.sin(theta), radius * math.cos(phi))
+end
+
 local function StartFollowing(player)
     StopFollowing()
     followTarget = player
+    lastTpTime = os.clock()
+    randomSpherePos = GetRandomSpherePoint(sphereSize)
     
     followConnection = RunService.Heartbeat:Connect(function(deltaTime)
         local myChar = Player.Character
@@ -253,46 +371,47 @@ local function StartFollowing(player)
             local myRoot = myChar:FindFirstChild("HumanoidRootPart")
             local tRoot = tChar:FindFirstChild("HumanoidRootPart")
             local myHumanoid = myChar:FindFirstChildOfClass("Humanoid")
+            local tHumanoid = tChar:FindFirstChildOfClass("Humanoid")
             
-            if myRoot and tRoot then
-                -- FIX LỖI CHẠY TẠI CHỖ: Triệt tiêu gia tốc chuyển động vật lý và vận tốc gốc
+            -- CẢI TIẾN: Chỉ dịch chuyển nếu cả hai đều đang SỐNG (Tránh lỗi văng map khi chết)
+            if myRoot and tRoot and myHumanoid and tHumanoid and myHumanoid.Health > 0 and tHumanoid.Health > 0 then
                 myRoot.Velocity = Vector3.new(0, 0, 0)
                 myRoot.RotVelocity = Vector3.new(0, 0, 0)
-                if myHumanoid then
-                    myHumanoid:Move(Vector3.new(0, 0, 0)) -- Buộc dừng di chuyển hoạt ảnh đi bộ
-                end
+                myHumanoid:Move(Vector3.new(0, 0, 0)) 
                 
                 local targetCFrame = tRoot.CFrame
                 
-                if followMode == "Sau lưng" then
+                if followMode == "Behind (Sau lưng)" then
                     targetCFrame = targetCFrame * CFrame.new(0, 0, followDistance)
-                elseif followMode == "Trước mặt" then
+                elseif followMode == "In Front (Trước mặt)" then
                     targetCFrame = targetCFrame * CFrame.new(0, 0, -followDistance) * CFrame.fromEulerAnglesXYZ(0, math.rad(180), 0)
-                elseif followMode == "Bên trái" then
-                    -- FIX RUNG MÁY KHOAN: Giữ nguyên độ cao Y ổn định và dùng điểm nhìn cố định chính xác
+                elseif followMode == "Left (Bên trái)" then
                     local leftPos = (tRoot.CFrame * CFrame.new(-followDistance, 0, 0)).Position
                     targetCFrame = CFrame.lookAt(leftPos, tRoot.Position)
-                elseif followMode == "Bên phải" then
-                    -- FIX RUNG MÁY KHOAN: Giữ nguyên độ cao Y ổn định và dùng điểm nhìn cố định chính xác
+                elseif followMode == "Right (Bên phải)" then
                     local rightPos = (tRoot.CFrame * CFrame.new(followDistance, 0, 0)).Position
                     targetCFrame = CFrame.lookAt(rightPos, tRoot.Position)
-                elseif followMode == "Bên trên" then
+                elseif followMode == "Above (Bên trên)" then
                     targetCFrame = targetCFrame * CFrame.new(0, followDistance, 0) * CFrame.fromEulerAnglesXYZ(math.rad(-90), 0, 0)
-                elseif followMode == "Bên dưới" then
+                elseif followMode == "Below (Bên dưới)" then
                     targetCFrame = targetCFrame * CFrame.new(0, -followDistance, 0) * CFrame.fromEulerAnglesXYZ(math.rad(90), 0, 0)
-                elseif followMode == "Xoay tròn" then
+                elseif followMode == "Orbit (Xoay tròn)" then
                     rotationAngle = rotationAngle + (deltaTime * rotateSpeed)
                     local offsetX = math.sin(rotationAngle) * followDistance
                     local offsetZ = math.cos(rotationAngle) * followDistance
                     targetCFrame = CFrame.lookAt(tRoot.Position + Vector3.new(offsetX, 0, offsetZ), tRoot.Position)
+                elseif followMode == "Sphere TP (Hình cầu)" then
+                    local currentTime = os.clock()
+                    if (currentTime - lastTpTime) >= (tpDelayMs / 1000) then
+                        randomSpherePos = GetRandomSpherePoint(sphereSize)
+                        lastTpTime = currentTime
+                    end
+                    local finalSpherePos = tRoot.Position + randomSpherePos
+                    targetCFrame = CFrame.lookAt(finalSpherePos, tRoot.Position)
                 end
                 
-                -- Áp dụng vị trí mượt mà tuyệt đối
                 myRoot.CFrame = targetCFrame
             end
-        else
-            StopFollowing()
-            RefreshMenu()
         end
     end)
 end
@@ -331,7 +450,7 @@ function RefreshMenu()
         nameLabel.Parent = itemFrame
         
         if p == Player then
-            nameLabel.Text = "[Tôi] " .. p.Name
+            nameLabel.Text = "[Me] " .. p.Name
             nameLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
             nameLabel.Font = Enum.Font.GothamBold
         else
@@ -343,7 +462,7 @@ function RefreshMenu()
         specBtn.Size = UDim2.new(0, 30, 0, 20)
         specBtn.Position = UDim2.new(1, -66, 0, 4)
         specBtn.BorderSizePixel = 0
-        specBtn.Text = "Xem"
+        specBtn.Text = "View"
         specBtn.TextSize = 9
         specBtn.Font = Enum.Font.GothamBold
         specBtn.Parent = itemFrame
@@ -369,7 +488,7 @@ function RefreshMenu()
             followBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
             followBtn.TextColor3 = Color3.fromRGB(100, 100, 100)
         else
-            followBtn.Text = "Đuôi"
+            followBtn.Text = "TP"
             if followTarget == p then
                 followBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
                 followBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -386,14 +505,20 @@ function RefreshMenu()
                 if spectateTarget == p then
                     ResetCamera()
                 else
+                    ResetCamera() -- Dọn dẹp liên kết cũ trước
                     spectateTarget = p
-                    local function setCam()
-                        if spectateTarget == p and p.Character and p.Character:FindFirstChild("Humanoid") then
-                            Camera.CameraSubject = p.Character.Humanoid
+                    
+                    -- Thực hiện View luôn lập tức
+                    ApplySpectate(p)
+                    
+                    -- CẢI TIẾN CHÍNH: Lắng nghe sự kiện người đó hồi sinh để TỰ ĐỘNG KHOÁ LẠI CAMERA
+                    targetCharAddedConn = p.CharacterAdded:Connect(function(newChar)
+                        local hum = newChar:WaitForChild("Humanoid", 5)
+                        if hum and spectateTarget == p then
+                            task.wait(0.2) -- Đợi camera game ổn định
+                            ApplySpectate(p)
                         end
-                    end
-                    setCam()
-                    p.CharacterAdded:Connect(setCam)
+                    end)
                 end
             end
             RefreshMenu()
@@ -417,7 +542,7 @@ end
 toggleMenuButton.MouseButton1Click:Connect(ToggleMenuVisibility)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.J then
+    if not gameProcessed and input.KeyCode == Enum.KeyCode == Enum.KeyCode.J then
         ToggleMenuVisibility()
     end
 end)
@@ -430,14 +555,13 @@ end)
 
 Players.PlayerAdded:Connect(RefreshMenu)
 
-Player.CharacterAdded:Connect(function()
-    task.wait(0.2)
+-- Xử lý khi CHÍNH BẢN THÂN BẠN hồi sinh
+Player.CharacterAdded:Connect(function(newChar)
+    local humanoid = newChar:WaitForChild("Humanoid", 5)
+    task.wait(0.3)
+    
     if spectateTarget then
-        pcall(function()
-            if spectateTarget.Character and spectateTarget.Character:FindFirstChild("Humanoid") then
-                Camera.CameraSubject = spectateTarget.Character.Humanoid
-            end
-        end)
+        ApplySpectate(spectateTarget) -- Giữ nguyên góc nhìn người khác sau khi bạn hồi sinh
     else
         ResetCamera()
     end
