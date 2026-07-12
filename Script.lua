@@ -1,11 +1,3 @@
---[[
-    PREMIUM HITBOX EXPANDER & DRAWING + HIGHLIGHT ESP INTEGRATED SYSTEM
-    Phiên bản nâng cấp: 
-    - GIỮ NGUYÊN 100% GIAO DIỆN GỐC VÀ CÁC TÍNH NĂNG CŨ.
-    - Tích hợp thêm Tab "Misc" riêng biệt để nhận Tool Click TP.
-    Tác giả UI: !vcsk0#1516
-]]
-
 if not game:IsLoaded() then
     game.Loaded:Wait()
 end
@@ -16,11 +8,10 @@ local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
--- === ĐỒNG BỘ TOÀN BỘ BIẾN TOÀN CỤC (GETGENV) ===
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.5 
 getgenv().HitboxStatus = false
-getgenv().TeamCheck = false -- Team Check của Hitbox
+getgenv().TeamCheck = false
 
 getgenv().Walkspeed = 16
 getgenv().Jumppower = 50
@@ -32,35 +23,21 @@ getgenv().TPWalk = false
 getgenv().Noclip = false
 getgenv().InfJ = false
 
--- Biến cấu hình ESP nâng cao
-getgenv().EspEnabled = false -- Cầu dao chính cho ESP Drawing
-getgenv().EspGlow = false    -- Tách riêng nút Viền Phát Quang (Highlight)
-getgenv().EspRainbow = false -- Nút tùy chọn Màu Rainbow cho toàn bộ hệ thống ESP
+getgenv().EspEnabled = false 
+getgenv().EspGlow = false    
+getgenv().EspRainbow = false 
 getgenv().EspNames = false   
 getgenv().EspDistance = false
 getgenv().EspBoxes = false
 getgenv().EspLines = false
-getgenv().EspTeamCheck = false -- Nút Team Check riêng dành cho hệ thống ESP
+getgenv().EspTeamCheck = false 
 
 local ESPCache = {}
-
--- Biến ngầm tính toán màu cầu vồng theo thời gian
 local RainbowColor = Color3.fromRGB(255, 0, 0)
-RunService.RenderStepped:Connect(function()
-    if getgenv().EspRainbow then
-        local tickTime = tick()
-        local r = math.sin(tickTime * 3) * 0.5 + 0.5
-        local g = math.sin(tickTime * 3 + 2) * 0.5 + 0.5
-        local b = math.sin(tickTime * 3 + 4) * 0.5 + 0.5
-        RainbowColor = Color3.new(r, g, b)
-    end
-end)
 
--- === KHỞI TẠO MENU CHUẨN HITBOX EXPANDER ===
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/UI-Library/main/Source/MyUILib(Unamed).lua"))();
 local Window = Library:Create("Hitbox Expander")
 
--- Nút bấm MENU tròn nhỏ (~10mm) di chuyển tự do được trên điện thoại (GIỮ NGUYÊN GỐC)
 local ToggleGui = Instance.new("ScreenGui", game.CoreGui)
 local Toggle = Instance.new("TextButton", ToggleGui)
 
@@ -83,13 +60,11 @@ Toggle.MouseButton1Click:connect(function()
     Library:ToggleUI()
 end)
 
--- Tạo cấu trúc 4 Tab (Thêm Tab Misc vào cuối)
 local HomeTab = Window:Tab("Home", "rbxassetid://10888331510")
 local PlayerTab = Window:Tab("Players", "rbxassetid://12296135476")
 local VisualTab = Window:Tab("Visuals", "rbxassetid://12308581351")
-local MiscTab = Window:Tab("Misc", "rbxassetid://10888331510") -- Tạp Tab riêng biệt đúng yêu cầu
+local MiscTab = Window:Tab("Misc", "rbxassetid://10888331510")
 
--- --- TAB 1: HOME (CÀI ĐẶT HITBOX) ---
 HomeTab:InfoLabel("Chỉnh kích cỡ & Độ đậm nhạt bằng cách nhập số")
 HomeTab:Section("Settings")
 
@@ -115,10 +90,15 @@ HomeTab:Keybind("Phím ẩn nhanh UI (PC)", Enum.KeyCode.F, function()
     Library:ToggleUI()
 end)
 
--- --- TAB 2: PLAYERS (GIAN LẬN DI CHUYỂN) ---
 PlayerTab:TextBox("WalkSpeed", function(value)
     getgenv().Walkspeed = tonumber(value) or 16
-    pcall(function() Player.Character.Humanoid.WalkSpeed = getgenv().Walkspeed end)
+    local char = Player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = getgenv().Walkspeed
+        end
+    end
 end)
 
 PlayerTab:Toggle("Loop WalkSpeed", function(state)
@@ -127,7 +107,13 @@ end)
 
 PlayerTab:TextBox("JumpPower", function(value)
     getgenv().Jumppower = tonumber(value) or 50
-    pcall(function() Player.Character.Humanoid.JumpPower = getgenv().Jumppower end)
+    local char = Player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.JumpPower = getgenv().Jumppower
+        end
+    end
 end)
 
 PlayerTab:Toggle("Loop JumpPower", function(state)
@@ -151,10 +137,12 @@ PlayerTab:Toggle("Infinite Jump", function(s)
 end)
 
 PlayerTab:Button("Rejoin", function()
-    game:GetService("TeleportService"):Teleport(game.PlaceId, Player)
+    local ts = game:GetService("TeleportService")
+    pcall(function()
+        ts:Teleport(game.PlaceId, Player)
+    end)
 end)
 
--- --- TAB 3: VISUALS (HỆ THỐNG DRAWING ESP PHÂN CẤP + TEAM CHECK) ---
 VisualTab:InfoLabel("Bật công cụ tổng trước, sau đó chọn nút con bên dưới")
 VisualTab:Section("Cầu dao chính")
 VisualTab:Toggle("Kích hoạt ESP Tổng (Master)", function(state) getgenv().EspEnabled = state end)
@@ -168,7 +156,6 @@ VisualTab:Toggle("Hiện Khoảng Cách (Distance)", function(state) getgenv().E
 VisualTab:Toggle("Hiện Khung Hộp (Box)", function(state) getgenv().EspBoxes = state end)
 VisualTab:Toggle("Hiện Tia Chỉ Đường (Lines)", function(state) getgenv().EspLines = state end)
 
--- --- TAB 4: MISC (MỤC RIÊNG BIỆT THÊM MỚI THEO YÊU CẦU) ---
 MiscTab:Section("Utilities")
 MiscTab:Button("Get Click TP Tool", function()
     local mouse = Player:GetMouse()
@@ -179,125 +166,36 @@ MiscTab:Button("Get Click TP Tool", function()
     tool.Activated:connect(function()
         local pos = mouse.Hit + Vector3.new(0, 2.5, 0)
         pos = CFrame.new(pos.X, pos.Y, pos.Z)
-        if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
-            Player.Character.HumanoidRootPart.CFrame = pos
+        local char = Player.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = pos
+            end
         end
     end)
     
     tool.Parent = Player.Backpack
 end)
 
-
--- === LOGIC 1: ĐIỀU CHỈNH ĐỘ ĐẬM NHẠT VÀ KÍCH CỠ HITBOX (TÍCH HỢP AUTO-FIX) ===
-RunService.RenderStepped:Connect(function()
-    for _, v in next, Players:GetPlayers() do
-        if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local root = v.Character.HumanoidRootPart
-            local isTeammate = (Player.Team == v.Team)
-            
-            if getgenv().HitboxStatus == true then
-                -- Kiểm tra Team Check của Hitbox
-                if (getgenv().TeamCheck == false) or (getgenv().TeamCheck == true and not isTeammate) then
-                    -- Cơ chế quét lỗi: Nếu kích thước hoặc thuộc tính không khớp chuẩn -> Ép kích thước ngay lập tức
-                    if root.Size ~= Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize) or root.Transparency ~= getgenv().HitboxTransparency then
-                        pcall(function()
-                            root.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
-                            root.Transparency = math.clamp(getgenv().HitboxTransparency, 0, 1) 
-                            root.BrickColor = BrickColor.new("Really black") 
-                            root.Material = Enum.Material.SmoothPlastic      
-                            root.CanCollide = false
-                        end)
-                    end
-                else
-                    -- Nếu cùng team mà bật TeamCheck -> Trả lại kích thước gốc để tránh lỗi
-                    if root.Size ~= Vector3.new(2, 2, 1) then
-                        pcall(function()
-                            root.Size = Vector3.new(2, 2, 1)
-                            root.Transparency = 1
-                        end)
-                    end
-                end
-            else
-                -- Khi tắt trạng thái Hitbox: Quét xem có ai chưa được trả lại gốc không để khôi phục nhanh
-                if root.Size ~= Vector3.new(2, 2, 1) or root.Transparency ~= 1 then
-                    pcall(function()
-                        root.Size = Vector3.new(2, 2, 1)
-                        root.Transparency = 1
-                        root.BrickColor = BrickColor.new("Medium stone grey")
-                        root.Material = Enum.Material.Plastic
-                        root.CanCollide = false
-                    end)
-                end
-            end
-        end
-    end
-end)
-
-
--- === LOGIC 2: ĐỒNG BỘ TOÀN BỘ CƠ CHẾ DI CHUYỂN, NOCLIP, INF JUMP ===
-RunService.Heartbeat:Connect(function()
-    pcall(function()
-        if getgenv().loopW and Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid.WalkSpeed = getgenv().Walkspeed
-        end
-        if getgenv().loopJ and Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid.JumpPower = getgenv().Jumppower
-        end
-        if getgenv().Noclip and Player.Character then
-            for _, part in ipairs(Player.Character:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end)
-end)
-
-task.spawn(function()
-    while true do
-        RunService.Heartbeat:Wait()
-        pcall(function()
-            if getgenv().TPWalk and Player.Character and Player.Character:FindFirstChild("Humanoid") then
-                local hum = Player.Character.Humanoid
-                if hum.MoveDirection.Magnitude > 0 then
-                    local tpSpeed = getgenv().TPSpeed and tonumber(getgenv().TPSpeed) or 3
-                    Player.Character:TranslateBy(hum.MoveDirection * tpSpeed)
-                end
-            end
-        end)
-    end
-end)
-
-UserInputService.JumpRequest:Connect(function()
-    pcall(function()
-        if getgenv().InfJ and Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
-            Player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
-        end
-    end)
-end)
-
-
--- === LOGIC 3: HỆ THỐNG DRAWING ESP PHÂN CẤP + HIGHLIGHT (TÍCH HỢP ĐIỀU KHIỂN RIÊNG & RAINBOW) ===
 local function ApplyDrawingESP(targetPlayer)
     if ESPCache[targetPlayer] then return end
 
     local esp = {
-        Highlight = Instance.new("Highlight"), -- Khởi tạo Highlight phát quang
+        Highlight = Instance.new("Highlight"),
         NameLabel = Drawing.new("Text"),
         DistanceLabel = Drawing.new("Text"),
         Box = Drawing.new("Square"),
-        Line = Drawing.new("Line"), 
-        Connection = nil
+        Line = Drawing.new("Line")
     }
 
-    -- Cấu hình mặc định cho Highlight phát quang
     esp.Highlight.FillTransparency = 1
     esp.Highlight.OutlineTransparency = 1
     esp.Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     
-    -- Xử lý an toàn khi nhân vật chưa load xong hoàn toàn
-    if targetPlayer.Character then
-        esp.Highlight.Parent = targetPlayer.Character
+    local char = targetPlayer.Character
+    if char then
+        esp.Highlight.Parent = char
     end
 
     esp.NameLabel.Center = true
@@ -314,133 +212,222 @@ local function ApplyDrawingESP(targetPlayer)
     esp.Line.Thickness = 1
 
     ESPCache[targetPlayer] = esp
-
-    esp.Connection = RunService.RenderStepped:Connect(function()
-        local char = targetPlayer.Character
-        
-        -- Cơ chế kiểm tra và tự sửa lỗi: Đảm bảo Highlight luôn được gắn chặt vào Character kể cả khi hồi sinh
-        if char and esp.Highlight.Parent ~= char then
-            pcall(function() esp.Highlight.Parent = char end)
-        end
-
-        -- Xác định điều kiện lọc Team Check của ESP
-        local isTeammate = (targetPlayer.Team == Player.Team)
-        local isEspAllowed = getgenv().EspEnabled and not (getgenv().EspTeamCheck and isTeammate)
-        local isGlowAllowed = getgenv().EspGlow and not (getgenv().EspTeamCheck and isTeammate)
-
-        -- Hệ thống gán màu linh hoạt: Nếu bật Rainbow thì dùng màu Rainbow, ngược lại dùng TeamColor gốc
-        local currentEspColor = getgenv().EspRainbow and RainbowColor or targetPlayer.TeamColor.Color
-
-        -- Điều khiển Độc lập Viền phát quang (Highlight)
-        if isGlowAllowed and char and char:FindFirstChild("HumanoidRootPart") then
-            esp.Highlight.Enabled = true
-            esp.Highlight.OutlineColor = currentEspColor
-            esp.Highlight.FillColor = currentEspColor
-            esp.Highlight.OutlineTransparency = 0  -- Viền sáng rõ nét
-            esp.Highlight.FillTransparency = 0.6    -- Thân mờ nhẹ xuyên tường
-        else
-            esp.Highlight.Enabled = false
-        end
-
-        -- Nếu không bật ESP Tổng hoặc đối tượng không hợp lệ -> Ẩn toàn bộ giao diện vẽ Drawing
-        if not isEspAllowed or not char or not Player.Character then
-            esp.NameLabel.Visible = false
-            esp.DistanceLabel.Visible = false
-            esp.Box.Visible = false
-            esp.Line.Visible = false
-            return
-        end
-
-        local head = char:FindFirstChild("Head")
-        local rootPart = char:FindFirstChild("HumanoidRootPart")
-        local myRoot = Player.Character:FindFirstChild("HumanoidRootPart")
-
-        if head and rootPart and myRoot then
-            local headPos, headOnScreen = Camera:WorldToScreenPoint(head.Position)
-            local rootPos, rootOnScreen = Camera:WorldToViewportPoint(rootPart.Position)
-
-            local distance = math.floor((rootPart.Position - myRoot.Position).Magnitude)
-
-            -- 1. Điều kiện hiện Tên (Đã hạ thấp Y xuống -6 cho bám sát đầu hơn)
-            if getgenv().EspNames and headOnScreen then
-                esp.NameLabel.Visible = true
-                esp.NameLabel.Position = Vector2.new(headPos.X, headPos.Y - 6)
-                esp.NameLabel.Text = targetPlayer.Name
-                esp.NameLabel.Color = currentEspColor
-            else
-                esp.NameLabel.Visible = false
-            end
-
-            -- 2. Điều kiện hiện Khoảng Cách (Đã hạ thấp Y xuống +10 cho gọn gàng ngay dưới tên/đầu)
-            if getgenv().EspDistance and headOnScreen then
-                esp.DistanceLabel.Visible = true
-                esp.DistanceLabel.Position = Vector2.new(headPos.X, headPos.Y + 10)
-                esp.DistanceLabel.Text = string.format("[%d studs]", distance)
-                esp.DistanceLabel.Color = getgenv().EspRainbow and RainbowColor or Color3.fromRGB(255, 255, 255)
-            else
-                esp.DistanceLabel.Visible = false
-            end
-
-            -- 3. Điều kiện hiện Hộp vuông định vị
-            if getgenv().EspBoxes and rootOnScreen then
-                esp.Box.Visible = true
-                local sizeX = 2000 / rootPos.Z
-                local sizeY = 3000 / rootPos.Z
-                esp.Box.Size = Vector2.new(sizeX, sizeY)
-                esp.Box.Position = Vector2.new(rootPos.X - sizeX / 2, rootPos.Y - sizeY / 2)
-                esp.Box.Color = currentEspColor
-            else
-                esp.Box.Visible = false
-            end
-
-            -- 4. Điều kiện hiện Tia chỉ đường xuống chân mục tiêu
-            if getgenv().EspLines and rootOnScreen and rootPos.Z > 0 then
-                esp.Line.Visible = true
-                esp.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                esp.Line.To = Vector2.new(rootPos.X, rootPos.Y)
-                esp.Line.Color = currentEspColor
-            else
-                esp.Line.Visible = false
-            end
-        else
-            esp.NameLabel.Visible = false
-            esp.DistanceLabel.Visible = false
-            esp.Box.Visible = false
-            esp.Line.Visible = false
-        end
-    end)
 end
 
--- Quản lý người chơi mới vào hoặc hồi sinh trong server phòng game
+local function RemoveESP(targetPlayer)
+    local esp = ESPCache[targetPlayer]
+    if esp then
+        if esp.Highlight then
+            pcall(function() esp.Highlight:Destroy() end)
+        end
+        if esp.NameLabel then esp.NameLabel:Remove() end
+        if esp.DistanceLabel then esp.DistanceLabel:Remove() end
+        if esp.Box then esp.Box:Remove() end
+        if esp.Line then esp.Line:Remove() end
+        ESPCache[targetPlayer] = nil
+    end
+end
+
 Players.PlayerAdded:Connect(function(p) 
     p.CharacterAdded:Connect(function(char)
-        if ESPCache[p] then
-            pcall(function() ESPCache[p].Highlight.Parent = char end)
+        local esp = ESPCache[p]
+        if esp and esp.Highlight then
+            pcall(function() esp.Highlight.Parent = char end)
         end
     end)
     ApplyDrawingESP(p) 
 end)
 
 Players.PlayerRemoving:Connect(function(p)
-    if ESPCache[p] then
-        if ESPCache[p].Connection then ESPCache[p].Connection:Disconnect() end
-        pcall(function() ESPCache[p].Highlight:Destroy() end)
-        pcall(function() ESPCache[p].NameLabel:Remove() end)
-        pcall(function() ESPCache[p].DistanceLabel:Remove() end)
-        pcall(function() ESPCache[p].Box:Remove() end)
-        pcall(function() ESPCache[p].Line:Remove() end)
-        ESPCache[p] = nil
-    end
+    RemoveESP(p)
 end)
 
--- Chạy vòng lặp kích hoạt ban đầu cho tất cả mọi người có sẵn
 for _, p in ipairs(Players:GetPlayers()) do
     if p ~= Player then 
         p.CharacterAdded:Connect(function(char)
-            if ESPCache[p] then
-                pcall(function() ESPCache[p].Highlight.Parent = char end)
+            local esp = ESPCache[p]
+            if esp and esp.Highlight then
+                pcall(function() esp.Highlight.Parent = char end)
             end
         end)
         ApplyDrawingESP(p) 
     end
 end
+
+RunService.RenderStepped:Connect(function()
+    local tickTime = tick()
+    if getgenv().EspRainbow then
+        local r = math.sin(tickTime * 3) * 0.5 + 0.5
+        local g = math.sin(tickTime * 3 + 2) * 0.5 + 0.5
+        local b = math.sin(tickTime * 3 + 4) * 0.5 + 0.5
+        RainbowColor = Color3.new(r, g, b)
+    end
+
+    local myChar = Player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= Player then
+            local vChar = v.Character
+            local vRoot = vChar and vChar:FindFirstChild("HumanoidRootPart")
+            
+            if vRoot then
+                local isTeammate = (Player.Team == v.Team)
+                
+                if getgenv().HitboxStatus == true then
+                    if (getgenv().TeamCheck == false) or (getgenv().TeamCheck == true and not isTeammate) then
+                        if vRoot.Size ~= Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize) or vRoot.Transparency ~= getgenv().HitboxTransparency then
+                            vRoot.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                            vRoot.Transparency = math.clamp(getgenv().HitboxTransparency, 0, 1) 
+                            vRoot.BrickColor = BrickColor.new("Really black") 
+                            vRoot.Material = Enum.Material.SmoothPlastic      
+                            vRoot.CanCollide = false
+                        end
+                    else
+                        if vRoot.Size ~= Vector3.new(2, 2, 1) then
+                            vRoot.Size = Vector3.new(2, 2, 1)
+                            vRoot.Transparency = 1
+                        end
+                    end
+                else
+                    if vRoot.Size ~= Vector3.new(2, 2, 1) or vRoot.Transparency ~= 1 then
+                        vRoot.Size = Vector3.new(2, 2, 1)
+                        vRoot.Transparency = 1
+                        vRoot.BrickColor = BrickColor.new("Medium stone grey")
+                        vRoot.Material = Enum.Material.Plastic
+                        vRoot.CanCollide = false
+                    end
+                end
+            end
+
+            local esp = ESPCache[v]
+            if esp then
+                if vChar and esp.Highlight and esp.Highlight.Parent ~= vChar then
+                    pcall(function() esp.Highlight.Parent = vChar end)
+                end
+
+                local isTeammate = (v.Team == Player.Team)
+                local isEspAllowed = getgenv().EspEnabled and not (getgenv().EspTeamCheck and isTeammate)
+                local isGlowAllowed = getgenv().EspGlow and not (getgenv().EspTeamCheck and isTeammate)
+                local currentEspColor = getgenv().EspRainbow and RainbowColor or v.TeamColor.Color
+
+                if isGlowAllowed and vChar and vRoot then
+                    esp.Highlight.Enabled = true
+                    esp.Highlight.OutlineColor = currentEspColor
+                    esp.Highlight.FillColor = currentEspColor
+                    esp.Highlight.OutlineTransparency = 0  
+                    esp.Highlight.FillTransparency = 0.6    
+                else
+                    esp.Highlight.Enabled = false
+                end
+
+                if not isEspAllowed or not vChar or not myChar then
+                    esp.NameLabel.Visible = false
+                    esp.DistanceLabel.Visible = false
+                    esp.Box.Visible = false
+                    esp.Line.Visible = false
+                else
+                    local head = vChar:FindFirstChild("Head")
+                    if head and vRoot and myRoot then
+                        local headPos, headOnScreen = Camera:WorldToScreenPoint(head.Position)
+                        local rootPos, rootOnScreen = Camera:WorldToViewportPoint(vRoot.Position)
+                        local distance = math.floor((vRoot.Position - myRoot.Position).Magnitude)
+
+                        if getgenv().EspNames and headOnScreen then
+                            esp.NameLabel.Visible = true
+                            esp.NameLabel.Position = Vector2.new(headPos.X, headPos.Y - 6)
+                            esp.NameLabel.Text = v.Name
+                            esp.NameLabel.Color = currentEspColor
+                        else
+                            esp.NameLabel.Visible = false
+                        end
+
+                        if getgenv().EspDistance and headOnScreen then
+                            esp.DistanceLabel.Visible = true
+                            esp.DistanceLabel.Position = Vector2.new(headPos.X, headPos.Y + 10)
+                            esp.DistanceLabel.Text = string.format("[%d studs]", distance)
+                            esp.DistanceLabel.Color = getgenv().EspRainbow and RainbowColor or Color3.fromRGB(255, 255, 255)
+                        else
+                            esp.DistanceLabel.Visible = false
+                        end
+
+                        if getgenv().EspBoxes and rootOnScreen then
+                            esp.Box.Visible = true
+                            local sizeX = 2000 / rootPos.Z
+                            local sizeY = 3000 / rootPos.Z
+                            esp.Box.Size = Vector2.new(sizeX, sizeY)
+                            esp.Box.Position = Vector2.new(rootPos.X - sizeX / 2, rootPos.Y - sizeY / 2)
+                            esp.Box.Color = currentEspColor
+                        else
+                            esp.Box.Visible = false
+                        end
+
+                        if getgenv().EspLines and rootOnScreen and rootPos.Z > 0 then
+                            esp.Line.Visible = true
+                            esp.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                            esp.Line.To = Vector2.new(rootPos.X, rootPos.Y)
+                            esp.Line.Color = currentEspColor
+                        else
+                            esp.Line.Visible = false
+                        end
+                    else
+                        esp.NameLabel.Visible = false
+                        esp.DistanceLabel.Visible = false
+                        esp.Box.Visible = false
+                        esp.Line.Visible = false
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    local char = Player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            if getgenv().loopW then
+                hum.WalkSpeed = getgenv().Walkspeed
+            end
+            if getgenv().loopJ then
+                hum.JumpPower = getgenv().Jumppower
+            end
+        end
+        if getgenv().Noclip then
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        RunService.Heartbeat:Wait()
+        if getgenv().TPWalk then
+            local char = Player.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.MoveDirection.Magnitude > 0 then
+                    local tpSpeed = getgenv().TPSpeed and tonumber(getgenv().TPSpeed) or 3
+                    char:TranslateBy(hum.MoveDirection * tpSpeed)
+                end
+            end
+        end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if getgenv().InfJ then
+        local char = Player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:ChangeState("Jumping")
+            end
+        end
+    end
+end)
